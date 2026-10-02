@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Magi Character Creator</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#172033;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1050px;margin:auto;padding:18px}.head{margin-bottom:16px}.head h1{margin:0;font-size:26px}.head p{margin:5px 0;color:#667085}
+.grid{display:grid;grid-template-columns:370px 1fr;gap:16px}.card{background:#fff;border:1px solid #e4e7ec;border-radius:18px;padding:16px;box-shadow:0 5px 20px #1018280d}
+label{font-weight:750;display:block;margin:12px 0 7px}textarea,select{width:100%;border:1px solid #d0d5dd;border-radius:11px;padding:11px;font:inherit}textarea{min-height:145px;resize:vertical}
+.refs{display:grid;grid-template-columns:1fr 1fr;gap:9px}.ref{height:125px;border:2px dashed #cbd5e1;border-radius:12px;position:relative;overflow:hidden;background:#f8fafc}.ref input{position:absolute;inset:0;opacity:0;z-index:2}.ref img{width:100%;height:100%;object-fit:contain;display:none}.ref span{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:#667085;font-size:12px;padding:8px}.ref.has img{display:block}.ref.has span{display:none}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:9px}button{width:100%;border:0;border-radius:11px;background:#111827;color:#fff;padding:13px;font-weight:800;font-size:15px;margin-top:15px}button:disabled{opacity:.5}
+.hint,.status{font-size:12px;color:#667085;line-height:1.5;margin-top:7px}.result{min-height:500px;background:#f8fafc;border-radius:13px;display:grid;place-items:center;overflow:hidden}.result img{width:100%;height:auto;display:block}.empty{padding:30px;text-align:center;color:#98a2b3}.save{display:none;text-align:center;margin-top:11px}.save a{display:inline-block;background:#eef2ff;color:#3730a3;padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:750}
+@media(max-width:760px){.wrap{padding:12px}.grid{grid-template-columns:1fr}.result{min-height:280px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>Magi Character Creator</h1>
+    <p>Gunakan karakter referensi yang sama untuk membantu menjaga desain tetap konsisten.</p>
+  </div>
+  <div class="grid">
+    <section class="card">
+      <label>Karakter / gambar referensi</label>
+      <div class="refs">
+        <div class="ref"><input type="file" accept="image/png,image/jpeg,image/webp"><img><span>Karakter 1<br>ketuk untuk upload</span></div>
+        <div class="ref"><input type="file" accept="image/png,image/jpeg,image/webp"><img><span>Karakter 2<br>ketuk untuk upload</span></div>
+        <div class="ref"><input type="file" accept="image/png,image/jpeg,image/webp"><img><span>Referensi 3<br>opsional</span></div>
+        <div class="ref"><input type="file" accept="image/png,image/jpeg,image/webp"><img><span>Referensi 4<br>opsional</span></div>
+      </div>
+      <div class="hint">Maksimal 4 gambar referensi untuk satu generasi.</div>
+
+      <label for="prompt">Adegan</label>
+      <textarea id="prompt" placeholder="Contoh: Magi Merah mendekatkan ujung kanannya ke paku besi di atas meja kayu. Paku mulai menempel pada magnet. Magi Biru berada di sampingnya. Keduanya terlihat senang. Close-up, background kelas blur."></textarea>
+
+      <div class="row">
+        <div><label>Rasio</label><select id="ratio"><option>16:9</option><option>1:1</option><option>4:3</option><option>3:4</option><option>9:16</option></select></div>
+        <div><label>Ukuran</label><select id="size"><option>1K</option><option>2K</option><option>4K</option></select></div>
+      </div>
+
+      <button id="go">Generate Gambar</button>
+      <div id="status" class="status"></div>
+    </section>
+
+    <section class="card">
+      <div id="result" class="result"><div class="empty">Hasil gambar akan muncul di sini.</div></div>
+      <div id="save" class="save"><a id="saveLink" download="magi-generated.png">Simpan gambar</a></div>
+    </section>
+  </div>
+</div>
+
+<script>
+const boxes=[...document.querySelectorAll(".ref")];
+function read(file){return new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(file)})}
+boxes.forEach(b=>b.querySelector("input").addEventListener("change",async e=>{
+  if(!e.target.files[0])return;
+  b.querySelector("img").src=await read(e.target.files[0]);b.classList.add("has");
+}));
+document.getElementById("go").onclick=async()=>{
+  const prompt=document.getElementById("prompt").value.trim(), btn=document.getElementById("go");
+  const status=document.getElementById("status"), result=document.getElementById("result"), save=document.getElementById("save"), link=document.getElementById("saveLink");
+  if(!prompt){status.textContent="Isi adegan terlebih dahulu.";return}
+  const references=boxes.map(b=>b.querySelector("img").src).filter(x=>x.startsWith("data:image/"));
+  btn.disabled=true;status.textContent="Sedang membuat gambar...";save.style.display="none";
+  result.innerHTML='<div class="empty">Gemini sedang menghasilkan gambar...</div>';
+  try{
+    const r=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+      prompt,references,aspectRatio:document.getElementById("ratio").value,imageSize:document.getElementById("size").value
+    })});
+    const d=await r.json();if(!r.ok)throw Error(d.error||"Gagal membuat gambar.");
+    result.innerHTML="";const img=document.createElement("img");img.src=d.imageDataUrl;img.alt="Hasil gambar";result.appendChild(img);
+    link.href=d.imageDataUrl;save.style.display="block";status.textContent="Selesai.";
+  }catch(e){result.innerHTML='<div class="empty">Gagal membuat gambar.</div>';status.textContent="Error: "+e.message}
+  finally{btn.disabled=false}
+};
+</script>
+</body>
+</html>
