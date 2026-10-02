@@ -67,7 +67,7 @@ ${prompt.trim()}`
         input,
         response_format: {
           type: "image",
-          mime_type: "image/png",
+          mime_type: "image/jpeg",
           aspect_ratio: aspectRatio,
           image_size: imageSize
         }
